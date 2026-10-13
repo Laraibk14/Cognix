@@ -1,0 +1,25 @@
+flask==3.1.0
+flask-cors==5.0.1
+gunicorn==21.2.0
+
+# NLP / ML
+nltk==3.9.1
+scikit-learn==1.4.2
+numpy==1.26.4
+
+# Hugging Face — CPU-only torch (no GPU on t2.micro free tier)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.0+cpu
+transformers==4.40.0
+huggingface-hub==0.23.4
+sentence-transformers==3.0.1
+tokenizers>=0.19,<0.22
+
+# PDF & Document generation / extraction
+reportlab==4.2.5
+pdfplumber==0.11.4
+python-docx>=1.0.0
+
+# LLM Gateway & Utilities
+python-dotenv==1.0.1
+
