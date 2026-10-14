@@ -39,6 +39,6 @@ output "ami_id" {
 }
 
 output "frontend_env" {
-  description = "Paste this into frontend/.env.local"
-  value       = "NEXT_PUBLIC_API_URL=http://${aws_eip.app.public_ip}/api"
+  description = "Same-origin frontend configuration; replace YOUR_DOMAIN only for a separately hosted frontend"
+  value       = "NEXT_PUBLIC_API_URL=/api # Separate frontend: https://YOUR_DOMAIN/api"
 }

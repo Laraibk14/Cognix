@@ -33,8 +33,8 @@ LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 # Flask
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 FLASK_HOST = os.getenv("FLASK_HOST", "0.0.0.0")
 FLASK_PORT = int(os.getenv("FLASK_PORT", "5000"))
 FLASK_DEBUG = os.getenv("FLASK_DEBUG", "true").lower() == "true"
-
 

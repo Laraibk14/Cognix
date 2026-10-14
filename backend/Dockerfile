@@ -1,9 +1,9 @@
 # =============================================================================
-# Backend Multi-Stage Dockerfile (Python 3.11-slim + PyTorch CPU)
+# Backend Multi-Stage Dockerfile (Python 3.14-slim + PyTorch CPU)
 # =============================================================================
 
 # Stage 1: Build & Dependencies
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 RUN python -c "import nltk; nltk.download('punkt', quiet=True); nltk.download('stopwords', quiet=True); nltk.download('punkt_tab', quiet=True)"
 
 # Stage 2: Final Production Runner
-FROM python:3.11-slim AS runner
+FROM python:3.14-slim AS runner
 
 WORKDIR /app
 

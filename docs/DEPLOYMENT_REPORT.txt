@@ -1,0 +1,356 @@
+COGNIX DEPLOYMENT REPORT
+========================
+
+Purpose
+-------
+This report explains how to deploy Cognix without Docker on an Ubuntu EC2
+server. The intended production layout is:
+
+  Browser / frontend host
+          |
+          v
+  Nginx on EC2 :80 or :443
+          |
+          v
+  Gunicorn on 127.0.0.1:5000
+          |
+          v
+  Flask backend
+
+The repository currently configures Nginx to proxy the API. It does not serve
+the Next.js frontend from Nginx. The frontend can either be hosted separately
+or configured and served separately on the same server.
+
+
+1. Requirements
+---------------
+
+Server:
+- Ubuntu 22.04 or a compatible Ubuntu server
+- Python 3.11 or newer (Python 3.14 is supported)
+- Node.js 20 or newer if building/running the frontend on this server
+- Nginx
+- Git
+- At least 2 GB RAM is recommended for model loading
+- An Elastic IP or a domain name is recommended
+
+The backend dependencies are in:
+  backend/requirements.txt
+
+The backend uses Python packages with native wheels. Always install them
+inside the project's virtual environment.
+
+
+2. AWS Security Group
+---------------------
+
+Allow inbound:
+- SSH (22): only from the administrator's IP address, preferably as
+  YOUR_ADMIN_IP/32
+- HTTP (80): 0.0.0.0/0 if using HTTP or if certbot will issue a certificate
+- HTTPS (443): 0.0.0.0/0 for HTTPS access
+
+Do not expose port 5000 publicly. Gunicorn binds to 127.0.0.1 and Nginx
+accesses it locally.
+
+
+3. Download the application
+---------------------------
+
+Replace YOUR_REPOSITORY_URL with the actual repository URL:
+
+  sudo mkdir -p /opt
+  sudo git clone YOUR_REPOSITORY_URL /opt/ai-question-paper-generator
+  sudo chown -R "$USER":"$USER" /opt/ai-question-paper-generator
+  cd /opt/ai-question-paper-generator
+
+If the repository is private, configure SSH deploy keys or another secure
+Git authentication method. Do not put credentials in this report or in the
+repository.
+
+
+4. Create the backend environment
+---------------------------------
+
+  cd /opt/ai-question-paper-generator/backend
+  python3 -m venv venv
+  . venv/bin/activate
+  python -m pip install --upgrade pip
+  python -m pip install -r requirements.txt
+  cp .env.example .env
+
+Edit backend/.env. Use the following production values:
+
+  FLASK_ENV=production
+  FLASK_DEBUG=0
+  FLASK_HOST=127.0.0.1
+  FLASK_PORT=5000
+
+  T5_MODEL_NAME=valhalla/t5-small-qg-hl
+  BERT_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
+
+For a low-memory server, keep:
+
+  DISABLE_T5_MODEL=true
+
+Set it to false only when the server has enough memory for the T5 model.
+
+Choose one LLM provider if online LLM features are required:
+
+  DEFAULT_LLM_MODEL=gemini/gemini-2.0-flash
+  GEMINI_API_KEY=REPLACE_WITH_GEMINI_KEY
+
+Alternatively use one of the provider/model combinations already listed in
+backend/.env.example and set the matching API key. Keep unused provider keys
+empty.
+
+For same-origin frontend deployment, use the public frontend origin in CORS:
+
+  CORS_ORIGINS=https://YOUR_DOMAIN
+
+Replace YOUR_DOMAIN with the real domain. If the site is accessed through
+both the bare domain and www, use:
+
+  CORS_ORIGINS=https://YOUR_DOMAIN,https://www.YOUR_DOMAIN
+
+For temporary IP-based testing over HTTP, use:
+
+  CORS_ORIGINS=http://YOUR_PUBLIC_IP
+
+Ollama is optional. Only change this value if Ollama is being used:
+
+  OLLAMA_BASE_URL=http://localhost:11434
+
+If Ollama is on another server, replace localhost with its private hostname
+or IP address.
+
+Never commit backend/.env. It can contain API keys.
+
+
+5. Initialize and test the backend
+----------------------------------
+
+From backend/ with the virtual environment activated:
+
+  python -c "from database.db import init_db; init_db(); print('Database ready')"
+  python app.py
+
+In another SSH session, test locally on the server:
+
+  curl http://127.0.0.1:5000/api/health
+
+Stop the development process after the health check:
+
+  Ctrl+C
+
+
+6. Configure systemd and Gunicorn
+---------------------------------
+
+The repository includes:
+  deploy/app.service
+
+The service expects the application at:
+  /opt/ai-question-paper-generator
+
+Install it:
+
+  sudo cp deploy/app.service /etc/systemd/system/ai-question-paper.service
+  sudo systemctl daemon-reload
+  sudo systemctl enable ai-question-paper
+  sudo systemctl start ai-question-paper
+
+Check status:
+
+  sudo systemctl status ai-question-paper --no-pager
+
+View logs:
+
+  sudo journalctl -u ai-question-paper -f
+
+The service intentionally binds Gunicorn to:
+  127.0.0.1:5000
+
+Do not change this to a public interface unless there is a specific reason.
+Nginx is the public entry point.
+
+
+7. Configure Nginx
+------------------
+
+Install Nginx if needed:
+
+  sudo apt-get update
+  sudo apt-get install -y nginx
+
+Install the repository configuration:
+
+  sudo cp deploy/nginx.conf /etc/nginx/sites-available/cognix
+  sudo ln -s /etc/nginx/sites-available/cognix /etc/nginx/sites-enabled/cognix
+  sudo rm -f /etc/nginx/sites-enabled/default
+
+Edit /etc/nginx/sites-available/cognix:
+
+  server_name YOUR_DOMAIN;
+
+If testing by public IP instead of a domain, use:
+
+  server_name YOUR_PUBLIC_IP;
+
+The following internal proxy URLs should remain unchanged:
+
+  proxy_pass http://127.0.0.1:5000;
+
+Validate and reload:
+
+  sudo nginx -t
+  sudo systemctl reload nginx
+
+Test the public API:
+
+  curl http://YOUR_DOMAIN/health
+
+The current Nginx file exposes:
+- /api/... to the Flask API
+- /health as a public health endpoint
+- no frontend pages
+
+
+8. Frontend configuration
+-------------------------
+
+The frontend API setting is read during the Next.js build. It must be set
+before running npm run build.
+
+For a frontend served from the same public origin as the API, create
+frontend/.env.local with:
+
+  NEXT_PUBLIC_API_URL=/api
+
+This is the recommended configuration. The browser calls:
+
+  https://YOUR_DOMAIN/api/...
+
+Nginx then forwards the request internally to:
+
+  http://127.0.0.1:5000/api/...
+
+For a separately hosted frontend, replace YOUR_DOMAIN with the public API
+host:
+
+  NEXT_PUBLIC_API_URL=https://YOUR_DOMAIN/api
+
+Do not use either of these in a browser-facing production build:
+
+  NEXT_PUBLIC_API_URL=http://127.0.0.1:5000/api
+  NEXT_PUBLIC_API_URL=http://backend:5000/api
+
+127.0.0.1 refers to the user's own computer in the browser. "backend" is a
+Docker service name and is not applicable to this non-Docker deployment.
+
+Build the frontend:
+
+  cd /opt/ai-question-paper-generator/frontend
+  npm ci
+  npm run build
+
+The current Nginx configuration does not serve the Next.js frontend. If the
+frontend is hosted on Vercel, Netlify, or another frontend host, set its
+NEXT_PUBLIC_API_URL to:
+
+  https://YOUR_DOMAIN/api
+
+and rebuild/redeploy the frontend there.
+
+If the frontend should run on the same EC2 server, run Next.js as a separate
+systemd service on localhost:3000 and add a separate Nginx location for it.
+Do not point users directly at port 3000 in production.
+
+
+9. HTTPS
+---------
+
+For production, use a real DNS name and HTTPS. Point the DNS A record for
+YOUR_DOMAIN to the EC2 Elastic IP, then install certbot:
+
+  sudo apt-get install -y certbot python3-certbot-nginx
+  sudo certbot --nginx -d YOUR_DOMAIN
+
+After HTTPS is configured, use:
+
+  CORS_ORIGINS=https://YOUR_DOMAIN
+  NEXT_PUBLIC_API_URL=/api
+
+The public endpoints should then be:
+
+  https://YOUR_DOMAIN/
+  https://YOUR_DOMAIN/api/health
+
+Do not use an HTTP API URL from an HTTPS frontend.
+
+
+10. Deployment verification checklist
+--------------------------------------
+
+Run these checks in order:
+
+[ ] backend/.env exists and contains the correct provider key
+[ ] backend/.env is not committed to Git
+[ ] Python dependencies installed successfully
+[ ] database initialized
+[ ] systemd service is active
+[ ] curl http://127.0.0.1:5000/api/health succeeds
+[ ] Nginx configuration passes nginx -t
+[ ] Nginx is active
+[ ] curl http://YOUR_DOMAIN/health succeeds
+[ ] frontend uses NEXT_PUBLIC_API_URL=/api for same-origin deployment
+[ ] frontend was rebuilt after changing NEXT_PUBLIC_API_URL
+[ ] HTTPS is enabled before using production credentials
+[ ] AWS security group does not expose port 5000
+
+
+11. Common problems
+-------------------
+
+Problem: Browser reports that it cannot connect to the backend.
+Cause: The frontend was built with 127.0.0.1 or a Docker service URL.
+Fix: Set NEXT_PUBLIC_API_URL=/api, rebuild the frontend, and reload it.
+
+Problem: Local backend health check works but the public health check fails.
+Cause: Nginx configuration, security group, DNS, or service status issue.
+Fix: Check:
+
+  sudo systemctl status nginx --no-pager
+  sudo nginx -t
+  sudo systemctl status ai-question-paper --no-pager
+  sudo journalctl -u ai-question-paper -n 100 --no-pager
+
+Problem: CORS errors appear for a separately hosted frontend.
+Cause: CORS_ORIGINS does not exactly match the frontend origin.
+Fix: Set CORS_ORIGINS to the full scheme and host, for example:
+
+  CORS_ORIGINS=https://YOUR_FRONTEND_DOMAIN
+
+Then restart Gunicorn:
+
+  sudo systemctl restart ai-question-paper
+
+Problem: Model loading causes the service to restart or the server to run out
+of memory.
+Fix: Keep DISABLE_T5_MODEL=true on small instances, use a larger instance,
+and check:
+
+  free -h
+  sudo journalctl -u ai-question-paper -n 100 --no-pager
+
+
+Important security notes
+------------------------
+
+- Replace every YOUR_DOMAIN, YOUR_PUBLIC_IP, and YOUR_REPOSITORY_URL value.
+- Do not commit API keys, .env files, Terraform state, or private SSH keys.
+- Restrict SSH access to a known administrator IP.
+- Use HTTPS before using real user credentials or production API keys.
+- Do not expose Gunicorn port 5000 publicly.
+- Keep the default Nginx API proxy target at 127.0.0.1:5000 for this
+  non-Docker deployment.

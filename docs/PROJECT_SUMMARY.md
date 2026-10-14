@@ -193,7 +193,7 @@ ai-question-paper-generator/
 | Components | Shadcn UI | Latest |
 | Icons | Lucide React | Latest |
 | Backend Framework | Flask | 3.1.0 |
-| Language | Python | 3.10+ |
+| Language | Python | 3.11+ |
 | NLP | NLTK | 3.9.1 |
 | ML Framework | Transformers | 4.47.1 |
 | Embeddings | Sentence Transformers | 3.3.1 |

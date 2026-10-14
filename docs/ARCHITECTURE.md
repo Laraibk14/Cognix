@@ -76,7 +76,7 @@ The AI Question Paper Generator follows a **client-server architecture** with a 
 
 ### 2. Backend Layer (Flask)
 
-**Technology:** Flask, Python 3.10+
+**Technology:** Flask, Python 3.11+
 
 **Responsibilities:**
 - API endpoints
@@ -255,7 +255,7 @@ CREATE TABLE papers (
 |-------|------------|
 | Frontend | Next.js 16, React, TypeScript |
 | UI Framework | Tailwind CSS, Shadcn UI |
-| Backend | Flask, Python 3.10+ |
+| Backend | Flask, Python 3.11+ |
 | NLP | NLTK, Scikit-learn |
 | AI Models | T5 (question gen), BERT (similarity) |
 | Database | SQLite |

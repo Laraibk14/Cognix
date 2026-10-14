@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5000/api";
+// Use the public reverse-proxy path by default. Set NEXT_PUBLIC_API_URL to an
+// absolute URL only when the frontend and API are hosted on different origins.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 async function request<T>(
   endpoint: string,

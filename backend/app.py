@@ -24,6 +24,7 @@ from config import (
     BERT_MODEL_NAME,
     TORCH_NUM_THREADS,
     MAX_CONCURRENT_GENERATIONS,
+    CORS_ORIGINS,
 )
 from utils.db_backup import backup_database
 from database.db import (
@@ -81,8 +82,12 @@ GENERATION_TASKS = {}
 
 # Initialize Flask app
 app = Flask(__name__)
-# Allow all origins (frontend could be on Vercel, Netlify, or local network IP)
-CORS(app, resources={r"/api/*": {"origins": "*"}})  # type: ignore
+allowed_origins = (
+    "*"
+    if CORS_ORIGINS.strip() == "*"
+    else [origin.strip() for origin in CORS_ORIGINS.split(",") if origin.strip()]
+)
+CORS(app, resources={r"/api/*": {"origins": allowed_origins}})  # type: ignore
 
 # Initialize components
 llm_gateway = LLMGateway()

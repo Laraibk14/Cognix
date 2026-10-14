@@ -152,7 +152,11 @@ FLASK_DEBUG=true
 ### Frontend (.env.local)
 
 ```env
-NEXT_PUBLIC_API_URL=http://127.0.0.1:5000/api
+# Same-origin production deployment through Nginx:
+NEXT_PUBLIC_API_URL=/api
+
+# If the frontend is hosted separately, replace YOUR_DOMAIN:
+# NEXT_PUBLIC_API_URL=https://YOUR_DOMAIN/api
 ```
 
 ---
@@ -173,8 +177,8 @@ NEXT_PUBLIC_API_URL=http://127.0.0.1:5000/api
 ### Frontend Issues
 
 **Issue:** API connection failed
-- **Solution:** Ensure backend is running at `http://127.0.0.1:5000`
-- Check `.env.local` has correct `NEXT_PUBLIC_API_URL`
+- **Solution:** Ensure Nginx is forwarding `/api` to the backend on `http://127.0.0.1:5000`
+- Check `.env.local` has `NEXT_PUBLIC_API_URL=/api` for same-origin deployment, or replace `YOUR_DOMAIN` with the API host for a separately hosted frontend
 
 **Issue:** Build errors
 - **Solution:** Delete `node_modules` and `.next`, then run `npm install` again
@@ -207,7 +211,7 @@ Or deploy to Vercel/Netlify for automatic deployment.
 
 ## System Requirements
 
-- **Python:** 3.10+
+- **Python:** 3.11+
 - **Node.js:** 18+
 - **RAM:** 2GB minimum (4GB recommended for model loading)
 - **Disk:** 500MB for models + dependencies

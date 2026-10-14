@@ -3,7 +3,7 @@
 ## Development Setup
 
 ### Prerequisites
-- Python 3.10+
+- Python 3.11+
 - Node.js 18+
 - Git
 
